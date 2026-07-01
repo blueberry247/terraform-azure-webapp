@@ -1,17 +1,48 @@
-variable "subscription_id" {}
+####################################################
+# Azure Subscription
+####################################################
 
-variable "location" {
-  default = "UK West"
+variable "subscription_id" {
+  description = "Azure Subscription ID"
+  type        = string
 }
+
+####################################################
+# Resource Group
+####################################################
 
 variable "resource_group_name" {
-  default = "rg-devops-webapp"
+  description = "Azure Resource Group Name"
+  type        = string
+  default     = "rg-devops-webapp"
 }
+
+####################################################
+# Location
+####################################################
+
+variable "location" {
+  description = "Azure Region"
+  type        = string
+  default     = "UK West"
+}
+
+####################################################
+# App Service Plan
+####################################################
 
 variable "service_plan_name" {
-  default = "asp-devops-webapp"
+  description = "Azure App Service Plan Name"
+  type        = string
+  default     = "asp-devops-webapp"
 }
 
+####################################################
+# Web App
+####################################################
+
 variable "webapp_name" {
-  default = "devops-webapp-farooq"
+  description = "Azure Linux Web App Name"
+  type        = string
+  default     = "devops-webapp-farooq"
 }
