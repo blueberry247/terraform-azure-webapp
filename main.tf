@@ -42,7 +42,6 @@ resource "azurerm_linux_web_app" "webapp" {
 
     application_stack {
       java_version   = "17"
-      tomcat_version = "10.0"
     }
   }
 
