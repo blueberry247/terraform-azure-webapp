@@ -30,3 +30,9 @@ resource "azurerm_linux_web_app" "webapp" {
 
   https_only = true
 }
+
+tags = {
+  Environment = "Dev"
+  Project     = "Terraform-WebApp"
+  Owner       = "Mohammed Farooq"
+}
