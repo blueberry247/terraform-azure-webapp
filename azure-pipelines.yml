@@ -6,31 +6,23 @@ pool:
 
 steps:
 
-# Checkout the repository
 - checkout: self
 
-# Install Terraform
-- task: TerraformInstaller@1
-  displayName: 'Install Terraform'
-  inputs:
-    terraformVersion: 'latest'
-
-# Show Terraform version
 - script: |
+    wget https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
+    unzip terraform_1.9.8_linux_amd64.zip
+    sudo mv terraform /usr/local/bin/
     terraform version
-  displayName: 'Terraform Version'
+  displayName: 'Install Terraform'
 
-# Initialize Terraform
 - script: |
     terraform init
   displayName: 'Terraform Init'
 
-# Validate Terraform
 - script: |
     terraform validate
   displayName: 'Terraform Validate'
 
-# Create Terraform Plan
 - script: |
     terraform plan
   displayName: 'Terraform Plan'
