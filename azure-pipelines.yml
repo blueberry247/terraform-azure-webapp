@@ -112,7 +112,7 @@ stages:
         # Azure Service Connection
         #####################################################
 
-        azureSubscription: 'Azure-WebApp-Connection'
+        azureSubscription: 'devops'
 
         #####################################################
         # Use Bash on the Ubuntu build agent
