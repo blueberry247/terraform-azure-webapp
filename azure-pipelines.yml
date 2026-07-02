@@ -1,15 +1,13 @@
 #############################################################
 # Azure DevOps Pipeline
 #
-# Project:
-# Terraform Azure Web App
-#
-# Author:
-# Mohammed Farooq
+# Project: Terraform Azure Web App
+# Author: Mohammed Farooq
 #
 # Purpose:
-# Validate Terraform code and generate an execution plan
-# before deploying Azure infrastructure.
+# Validate Terraform
+# Generate a Terraform Plan
+# Deploy Azure Infrastructure
 #############################################################
 
 #############################################################
@@ -25,54 +23,47 @@ trigger:
 #############################################################
 # Agent Pool
 #
-# Use Microsoft's hosted Ubuntu build agent.
+# Use Microsoft's Ubuntu build agent.
 #############################################################
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: ubuntu-latest
 
 #############################################################
 # Pipeline Variables
 #
-# Store reusable values in one place.
+# Store values that might change in one place.
 #############################################################
 
 variables:
+
+  # Terraform version to install
   terraformVersion: '1.9.8'
 
 #############################################################
 # Stage 1
 #
-# Validate the Terraform configuration and generate a plan.
+# Validate Terraform configuration
 #############################################################
 
 stages:
 
-- stage: Terraform
-  displayName: 'Terraform Validation & Plan'
+- stage: Validate
+  displayName: "Terraform Validate"
 
   jobs:
 
   ###########################################################
-  # Job
-  #
-  # Install Terraform
-  # Login to Azure
-  # Initialise Terraform
-  # Validate Terraform
-  # Generate Terraform Plan
+  # Validate Job
   ###########################################################
 
-  - job: Terraform
-    displayName: 'Terraform Job'
+  - job: Validate
+    displayName: "Validate Terraform"
 
     steps:
 
     #########################################################
-    # Checkout Repository
-    #
-    # Downloads the latest code from GitHub into the build
-    # agent.
+    # Download the GitHub repository
     #########################################################
 
     - checkout: self
@@ -80,10 +71,10 @@ stages:
     #########################################################
     # Install Terraform
     #
-    # Download the requested Terraform version.
-    # Extract the binary.
-    # Move Terraform into the Linux PATH.
-    # Display the installed version.
+    # Download Terraform
+    # Extract the binary
+    # Move it into the Linux PATH
+    # Display the installed version
     #########################################################
 
     - script: |
@@ -91,63 +82,186 @@ stages:
         unzip terraform_$(terraformVersion)_linux_amd64.zip
         sudo mv terraform /usr/local/bin/
         terraform version
-      displayName: 'Install Terraform'
+      displayName: Install Terraform
 
     #########################################################
-    # Login to Azure
+    # Terraform Validation
     #
-    # Azure DevOps automatically authenticates using the
-    # Azure Resource Manager Service Connection.
+    # Login to Azure using the Azure DevOps
+    # Service Connection.
     #
-    # Service Connection:
-    # Azure-WebApp-Connection
+    # terraform init
+    #   Downloads providers
+    #
+    # terraform fmt
+    #   Checks Terraform formatting
+    #
+    # terraform validate
+    #   Validates Terraform configuration
     #########################################################
 
     - task: AzureCLI@2
-      displayName: 'Terraform Init, Validate & Plan'
+      displayName: Terraform Validate
 
       inputs:
 
-        #####################################################
-        # Azure Service Connection
-        #####################################################
-
+        # Azure DevOps Service Connection
         azureSubscription: 'devops'
 
-        #####################################################
-        # Use Bash on the Ubuntu build agent
-        #####################################################
-
+        # Use Bash shell
         scriptType: bash
 
-        #####################################################
-        # Run commands directly inside the pipeline
-        #####################################################
-
+        # Run commands directly inside the YAML
         scriptLocation: inlineScript
-
-        #####################################################
-        # Terraform Commands
-        #
-        # terraform init
-        #   - Downloads AzureRM Provider
-        #   - Initialises the working directory
-        #
-        # terraform fmt -check
-        #   - Ensures Terraform code follows HashiCorp
-        #     formatting standards.
-        #
-        # terraform validate
-        #   - Checks Terraform syntax and configuration.
-        #
-        # terraform plan
-        #   - Shows what resources Terraform will create,
-        #     update or destroy.
-        #   - Does NOT make any changes to Azure.
-        #####################################################
 
         inlineScript: |
           terraform init
           terraform fmt -check
           terraform validate
-          terraform plan
+
+#############################################################
+# Stage 2
+#
+# Generate Terraform Execution Plan
+#############################################################
+
+- stage: Plan
+  displayName: "Terraform Plan"
+
+  # Only run if Validate succeeds
+  dependsOn: Validate
+
+  jobs:
+
+  ###########################################################
+  # Plan Job
+  ###########################################################
+
+  - job: Plan
+    displayName: "Generate Terraform Plan"
+
+    steps:
+
+    #########################################################
+    # Download repository
+    #########################################################
+
+    - checkout: self
+
+    #########################################################
+    # Install Terraform
+    #########################################################
+
+    - script: |
+        wget https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip
+        unzip terraform_$(terraformVersion)_linux_amd64.zip
+        sudo mv terraform /usr/local/bin/
+        terraform version
+      displayName: Install Terraform
+
+    #########################################################
+    # Generate Terraform Plan
+    #
+    # terraform plan does NOT deploy resources.
+    #
+    # It creates an execution plan showing what
+    # Terraform intends to build.
+    #
+    # The plan is saved as tfplan.
+    #########################################################
+
+    - task: AzureCLI@2
+      displayName: Terraform Plan
+
+      inputs:
+
+        azureSubscription: 'devops'
+
+        scriptType: bash
+
+        scriptLocation: inlineScript
+
+        inlineScript: |
+          terraform init
+          terraform plan -out=tfplan
+
+    #########################################################
+    # Publish the Terraform Plan
+    #
+    # Save tfplan as a Pipeline Artifact so the
+    # Apply stage can download it later.
+    #########################################################
+
+    - publish: tfplan
+      artifact: terraform-plan
+
+#############################################################
+# Stage 3
+#
+# Deploy Infrastructure
+#############################################################
+
+- stage: Apply
+
+  displayName: "Terraform Apply"
+
+  # Only run if the Plan stage succeeds
+  dependsOn: Plan
+
+  jobs:
+
+  ###########################################################
+  # Apply Job
+  ###########################################################
+
+  - job: Apply
+    displayName: "Deploy Infrastructure"
+
+    steps:
+
+    #########################################################
+    # Download repository
+    #########################################################
+
+    - checkout: self
+
+    #########################################################
+    # Download the Terraform Plan created in Stage 2
+    #########################################################
+
+    - download: current
+      artifact: terraform-plan
+
+    #########################################################
+    # Install Terraform
+    #########################################################
+
+    - script: |
+        wget https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip
+        unzip terraform_$(terraformVersion)_linux_amd64.zip
+        sudo mv terraform /usr/local/bin/
+      displayName: Install Terraform
+
+    #########################################################
+    # Deploy Infrastructure
+    #
+    # terraform apply
+    #
+    # Uses the plan generated in the previous stage
+    # to deploy Azure infrastructure.
+    #########################################################
+
+    - task: AzureCLI@2
+      displayName: Terraform Apply
+
+      inputs:
+
+        azureSubscription: 'devops'
+
+        scriptType: bash
+
+        scriptLocation: inlineScript
+
+        inlineScript: |
+          terraform init
+          terraform apply -auto-approve
