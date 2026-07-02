@@ -1,5 +1,20 @@
 #############################################################
+# Azure DevOps Pipeline
+#
+# Project:
+# Terraform Azure Web App
+#
+# Author:
+# Mohammed Farooq
+#
+# Purpose:
+# Validate Terraform code and generate an execution plan
+# before deploying Azure infrastructure.
+#############################################################
+
+#############################################################
 # Trigger
+#
 # Run this pipeline automatically whenever code is pushed
 # to the main branch.
 #############################################################
@@ -8,8 +23,9 @@ trigger:
 - main
 
 #############################################################
-# Microsoft-hosted build agent
-# Ubuntu is used because Terraform runs well on Linux.
+# Agent Pool
+#
+# Use Microsoft's hosted Ubuntu build agent.
 #############################################################
 
 pool:
@@ -17,34 +33,46 @@ pool:
 
 #############################################################
 # Pipeline Variables
-# Store values that may change in one place.
+#
+# Store reusable values in one place.
 #############################################################
 
 variables:
   terraformVersion: '1.9.8'
 
 #############################################################
-# Stage 1 - Validate Terraform
+# Stage 1
+#
+# Validate the Terraform configuration and generate a plan.
 #############################################################
 
 stages:
 
-- stage: Validate
-  displayName: 'Terraform Validation'
+- stage: Terraform
+  displayName: 'Terraform Validation & Plan'
 
   jobs:
 
   ###########################################################
-  # Job 1 - Validate Terraform Configuration
+  # Job
+  #
+  # Install Terraform
+  # Login to Azure
+  # Initialise Terraform
+  # Validate Terraform
+  # Generate Terraform Plan
   ###########################################################
 
-  - job: Validate
-    displayName: 'Terraform Validate'
+  - job: Terraform
+    displayName: 'Terraform Job'
 
     steps:
 
     #########################################################
-    # Checkout the GitHub repository
+    # Checkout Repository
+    #
+    # Downloads the latest code from GitHub into the build
+    # agent.
     #########################################################
 
     - checkout: self
@@ -52,10 +80,10 @@ stages:
     #########################################################
     # Install Terraform
     #
-    # Download the Terraform binary
-    # Extract it
-    # Move it into the Linux PATH
-    # Display the installed version
+    # Download the requested Terraform version.
+    # Extract the binary.
+    # Move Terraform into the Linux PATH.
+    # Display the installed version.
     #########################################################
 
     - script: |
@@ -66,48 +94,60 @@ stages:
       displayName: 'Install Terraform'
 
     #########################################################
-    # Terraform Init
+    # Login to Azure
     #
-    # Downloads the AzureRM provider
-    # Creates the .terraform folder
-    # Initializes the working directory
-    #########################################################
-
-    - script: |
-        terraform init
-      displayName: 'Terraform Init'
-
-    #########################################################
-    # Terraform Format Check
+    # Azure DevOps automatically authenticates using the
+    # Azure Resource Manager Service Connection.
     #
-    # Checks that all Terraform files follow
-    # HashiCorp formatting standards.
+    # Service Connection:
+    # Azure-WebApp-Connection
     #########################################################
 
-    - script: |
-        terraform fmt -check
-      displayName: 'Terraform Format Check'
+    - task: AzureCLI@2
+      displayName: 'Terraform Init, Validate & Plan'
 
-    #########################################################
-    # Terraform Validate
-    #
-    # Checks Terraform syntax and configuration.
-    # Does NOT contact Azure.
-    #########################################################
+      inputs:
 
-    - script: |
-        terraform validate
-      displayName: 'Terraform Validate'
+        #####################################################
+        # Azure Service Connection
+        #####################################################
 
-    #########################################################
-    # Terraform Plan
-    #
-    # Calculates what Terraform will create,
-    # modify or destroy.
-    #
-    # Does NOT create any Azure resources.
-    #########################################################
+        azureSubscription: 'Azure-WebApp-Connection'
 
-    - script: |
-        terraform plan
-      displayName: 'Terraform Plan'
+        #####################################################
+        # Use Bash on the Ubuntu build agent
+        #####################################################
+
+        scriptType: bash
+
+        #####################################################
+        # Run commands directly inside the pipeline
+        #####################################################
+
+        scriptLocation: inlineScript
+
+        #####################################################
+        # Terraform Commands
+        #
+        # terraform init
+        #   - Downloads AzureRM Provider
+        #   - Initialises the working directory
+        #
+        # terraform fmt -check
+        #   - Ensures Terraform code follows HashiCorp
+        #     formatting standards.
+        #
+        # terraform validate
+        #   - Checks Terraform syntax and configuration.
+        #
+        # terraform plan
+        #   - Shows what resources Terraform will create,
+        #     update or destroy.
+        #   - Does NOT make any changes to Azure.
+        #####################################################
+
+        inlineScript: |
+          terraform init
+          terraform fmt -check
+          terraform validate
+          terraform plan
