@@ -1,28 +1,113 @@
+#############################################################
+# Trigger
+# Run this pipeline automatically whenever code is pushed
+# to the main branch.
+#############################################################
+
 trigger:
 - main
+
+#############################################################
+# Microsoft-hosted build agent
+# Ubuntu is used because Terraform runs well on Linux.
+#############################################################
 
 pool:
   vmImage: 'ubuntu-latest'
 
-steps:
+#############################################################
+# Pipeline Variables
+# Store values that may change in one place.
+#############################################################
 
-- checkout: self
+variables:
+  terraformVersion: '1.9.8'
 
-- script: |
-    wget https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
-    unzip terraform_1.9.8_linux_amd64.zip
-    sudo mv terraform /usr/local/bin/
-    terraform version
-  displayName: 'Install Terraform'
+#############################################################
+# Stage 1 - Validate Terraform
+#############################################################
 
-- script: |
-    terraform init
-  displayName: 'Terraform Init'
+stages:
 
-- script: |
-    terraform validate
-  displayName: 'Terraform Validate'
+- stage: Validate
+  displayName: 'Terraform Validation'
 
-- script: |
-    terraform plan
-  displayName: 'Terraform Plan'
+  jobs:
+
+  ###########################################################
+  # Job 1 - Validate Terraform Configuration
+  ###########################################################
+
+  - job: Validate
+    displayName: 'Terraform Validate'
+
+    steps:
+
+    #########################################################
+    # Checkout the GitHub repository
+    #########################################################
+
+    - checkout: self
+
+    #########################################################
+    # Install Terraform
+    #
+    # Download the Terraform binary
+    # Extract it
+    # Move it into the Linux PATH
+    # Display the installed version
+    #########################################################
+
+    - script: |
+        wget https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip
+        unzip terraform_$(terraformVersion)_linux_amd64.zip
+        sudo mv terraform /usr/local/bin/
+        terraform version
+      displayName: 'Install Terraform'
+
+    #########################################################
+    # Terraform Init
+    #
+    # Downloads the AzureRM provider
+    # Creates the .terraform folder
+    # Initializes the working directory
+    #########################################################
+
+    - script: |
+        terraform init
+      displayName: 'Terraform Init'
+
+    #########################################################
+    # Terraform Format Check
+    #
+    # Checks that all Terraform files follow
+    # HashiCorp formatting standards.
+    #########################################################
+
+    - script: |
+        terraform fmt -check
+      displayName: 'Terraform Format Check'
+
+    #########################################################
+    # Terraform Validate
+    #
+    # Checks Terraform syntax and configuration.
+    # Does NOT contact Azure.
+    #########################################################
+
+    - script: |
+        terraform validate
+      displayName: 'Terraform Validate'
+
+    #########################################################
+    # Terraform Plan
+    #
+    # Calculates what Terraform will create,
+    # modify or destroy.
+    #
+    # Does NOT create any Azure resources.
+    #########################################################
+
+    - script: |
+        terraform plan
+      displayName: 'Terraform Plan'
